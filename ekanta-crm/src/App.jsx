@@ -2,13 +2,27 @@ import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 
 /*
   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  EKANTA CRM — v3 EXTENDED
-  Changes on top of v2 (production redesign):
-  ① Lead Source — required dropdown on every funnel (form, table, drawer, export)
-  ② Description filter — case-insensitive contains search across remarks + quoteDesc
-  ③ Stage custom description — editable per-stage note shown in Pipeline column header
+  EKANTA CRM — v4
+  Changes on top of v3:
+  ① Company name → optional (not required)
+  ② Quote Link field removed everywhere
+  ③ New fields: City/Region, Delivery Details, Payment Terms
+  ④ Audit Comments in ViewDrawer (Owner/Manager write, CRE/Sales read)
+  ⑤ Login: removed show/hide password toggle & hint text
+  ⑥ Mobile responsive (desktop first)
   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 */
+
+// ─── MOBILE HOOK ──────────────────────────────────────────────────────────────
+function useIsMobile() {
+  const [m, setM] = useState(typeof window !== "undefined" ? window.innerWidth < 768 : false);
+  useEffect(() => {
+    const h = () => setM(window.innerWidth < 768);
+    window.addEventListener("resize", h);
+    return () => window.removeEventListener("resize", h);
+  }, []);
+  return m;
+}
 
 // ─── FONT ─────────────────────────────────────────────────────────────────────
 function FontLoader() {
@@ -31,6 +45,17 @@ function FontLoader() {
       ::-webkit-scrollbar{width:4px;height:4px}
       ::-webkit-scrollbar-track{background:transparent}
       ::-webkit-scrollbar-thumb{background:rgba(0,0,0,.12);border-radius:4px}
+      @media(max-width:767px){
+        .ek-sidebar{display:none!important}
+        .ek-sidebar.open{display:flex!important}
+        .ek-stats-grid{grid-template-columns:repeat(2,1fr)!important}
+        .ek-topbar-search{display:none!important}
+        .ek-form-3col{grid-template-columns:1fr!important}
+        .ek-form-2col{grid-template-columns:1fr!important}
+        .ek-analytics-3col{grid-template-columns:1fr!important}
+        .ek-team-grid{grid-template-columns:1fr!important}
+        .ek-pipeline-grid{grid-template-columns:1fr!important}
+      }
     `;
     document.head.appendChild(g);
   }, []);
@@ -82,7 +107,6 @@ const FTYPES       = ["Normal","High Value","Bulk","Strategic","Premium"];
 const ROLES        = ["CEO","Manager","Sales Coordinator","CRE"];
 const STATUS       = ["Pending","Won","Lost","Drop"];
 const STAGES       = ["New Lead","Qualified","Proposal Sent","Won"];
-// ① NEW — Lead Source options
 const LEAD_SOURCES = ["WhatsApp","Email","Website","Call","Owner","Other"];
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
@@ -108,28 +132,29 @@ const SEED_USERS = [
   {id:4,name:"Priya Raj",  role:"Sales Coordinator",username:"priya",      password:"pass123" },
 ];
 
-// ① leadSource added to every seed record
+// ② quoteLink removed, ③ cityRegion/deliveryDetails/paymentTerms added
 const SEED_FUNNELS = [
-  {id:1,leadSource:"WhatsApp",createdAt:"Apr 01, 2026 10:00 AM",createdBy:"Admin",company:"Bridal Bliss Boutique",contact:"Ananya Sharma",phone:"+91 98765 43210",email:"ananya@bridalbliss.com",enquiryType:"Bulk Order",funnelType:"High Value",nextFollowUp:"2026-04-08",status:"Pending",stage:"Proposal Sent",products:[{desc:"Bridal Lehenga Set",category:"Lehengas",qty:10,price:25000},{desc:"Embroidered Saree",category:"Sarees",qty:15,price:8000}],remarks:"Owner-led boutique, bridal season focus. Decision maker responsive.",quoteNo:"QT-2026-001",quoteQty:25,quoteAmount:370000,quoteLink:"",quoteDesc:"Proposal sent, awaiting sign-off",billedAmount:null,billedDate:null},
-  {id:2,leadSource:"Call",createdAt:"Mar 28, 2026 02:30 PM",createdBy:"Admin",company:"Fashion Forward Store",contact:"Priya Menon",phone:"+91 98650 01122",email:"priya@fashionforward.com",enquiryType:"Wholesale",funnelType:"Normal",nextFollowUp:"2026-04-03",status:"Won",stage:"Won",products:[{desc:"Summer Dresses",category:"Dresses",qty:30,price:1200},{desc:"Casual Kurtis",category:"Kurtis",qty:50,price:800}],remarks:"Monthly reorder likely. Strong relationship.",quoteNo:"QT-2026-002",quoteQty:80,quoteAmount:76000,quoteLink:"",quoteDesc:"Closed",billedAmount:76000,billedDate:"2026-03-30"},
-  {id:3,leadSource:"Website",createdAt:"Mar 25, 2026 11:30 AM",createdBy:"Admin",company:"Sunrise Exports",contact:"Karthik S",phone:"+91 98123 45678",email:"karthik@sunriseexp.com",enquiryType:"Export",funnelType:"High Value",nextFollowUp:"2026-04-10",status:"Pending",stage:"Qualified",products:[{desc:"Banarasi Sarees",category:"Sarees",qty:100,price:5000},{desc:"Bridal Lehenga",category:"Lehengas",qty:20,price:30000}],remarks:"Annual export contract possible. Logistics discussion needed.",quoteNo:"QT-2026-003",quoteQty:120,quoteAmount:1100000,quoteLink:"",quoteDesc:"Awaiting approval",billedAmount:null,billedDate:null},
-  {id:4,leadSource:"WhatsApp",createdAt:"Mar 20, 2026 09:15 AM",createdBy:"Vinodhini",company:"Meera Collections",contact:"Meera Nair",phone:"+91 99001 12233",email:"meera@meeracoll.com",enquiryType:"New Client",funnelType:"Normal",nextFollowUp:"2026-04-04",status:"Pending",stage:"New Lead",products:[{desc:"Cotton Kurtis",category:"Kurtis",qty:60,price:600}],remarks:"New boutique, Coimbatore. High potential.",quoteNo:"QT-2026-004",quoteQty:60,quoteAmount:36000,quoteLink:"",quoteDesc:"Initial quote sent",billedAmount:null,billedDate:null},
-  {id:5,leadSource:"Owner",createdAt:"Mar 15, 2026 02:45 PM",createdBy:"Admin",company:"Apex Pharma Gifting",contact:"Suresh M",phone:"+91 99887 76655",email:"suresh@apexpharma.com",enquiryType:"Bulk Order",funnelType:"Premium",nextFollowUp:"2026-04-15",status:"Won",stage:"Won",products:[{desc:"Corporate Sarees",category:"Sarees",qty:200,price:3500},{desc:"Accessory Kits",category:"Accessories",qty:200,price:2100}],remarks:"CEO contact, annual gifting contract.",quoteNo:"QT-2026-005",quoteQty:400,quoteAmount:1120000,quoteLink:"",quoteDesc:"Closed",billedAmount:1120000,billedDate:"2026-03-20"},
-  {id:6,leadSource:"Email",createdAt:"Mar 10, 2026 04:00 PM",createdBy:"Arjun Kumar",company:"Nila Bridal House",contact:"Nila Devi",phone:"+91 94445 67890",email:"nila@nilabridalhouse.com",enquiryType:"Custom Design",funnelType:"Premium",nextFollowUp:"2026-04-12",status:"Pending",stage:"Qualified",products:[{desc:"Custom Lehenga",category:"Lehengas",qty:5,price:55000},{desc:"Designer Sarees",category:"Sarees",qty:8,price:12000}],remarks:"Bespoke only. Premium segment.",quoteNo:"QT-2026-006",quoteQty:13,quoteAmount:371000,quoteLink:"",quoteDesc:"Custom design quote under prep",billedAmount:null,billedDate:null},
-  {id:7,leadSource:"Website",createdAt:"Mar 05, 2026 10:30 AM",createdBy:"Priya Raj",company:"Tara Textiles",contact:"Tara Singh",phone:"+91 98321 09876",email:"tara@taratextiles.com",enquiryType:"Wholesale",funnelType:"Bulk",nextFollowUp:"2026-03-30",status:"Lost",stage:"New Lead",products:[{desc:"Western Tops",category:"Western Wear",qty:100,price:750}],remarks:"Lost on price. May revisit Q3.",quoteNo:"QT-2026-007",quoteQty:100,quoteAmount:75000,quoteLink:"",quoteDesc:"Not accepted",billedAmount:null,billedDate:null},
+  {id:1,leadSource:"WhatsApp",createdAt:"Apr 01, 2026 10:00 AM",createdBy:"Admin",company:"Bridal Bliss Boutique",contact:"Ananya Sharma",phone:"+91 98765 43210",email:"ananya@bridalbliss.com",enquiryType:"Bulk Order",funnelType:"High Value",nextFollowUp:"2026-04-08",status:"Pending",stage:"Proposal Sent",cityRegion:"Chennai",deliveryDetails:"Delivery by Apr 20",paymentTerms:"50% advance",products:[{desc:"Bridal Lehenga Set",category:"Lehengas",qty:10,price:25000},{desc:"Embroidered Saree",category:"Sarees",qty:15,price:8000}],remarks:"Owner-led boutique, bridal season focus. Decision maker responsive.",quoteNo:"QT-2026-001",quoteQty:25,quoteAmount:370000,quoteDesc:"Proposal sent, awaiting sign-off",billedAmount:null,billedDate:null},
+  {id:2,leadSource:"Call",createdAt:"Mar 28, 2026 02:30 PM",createdBy:"Admin",company:"Fashion Forward Store",contact:"Priya Menon",phone:"+91 98650 01122",email:"priya@fashionforward.com",enquiryType:"Wholesale",funnelType:"Normal",nextFollowUp:"2026-04-03",status:"Won",stage:"Won",cityRegion:"Bangalore",deliveryDetails:"",paymentTerms:"Full payment",products:[{desc:"Summer Dresses",category:"Dresses",qty:30,price:1200},{desc:"Casual Kurtis",category:"Kurtis",qty:50,price:800}],remarks:"Monthly reorder likely. Strong relationship.",quoteNo:"QT-2026-002",quoteQty:80,quoteAmount:76000,quoteDesc:"Closed",billedAmount:76000,billedDate:"2026-03-30"},
+  {id:3,leadSource:"Website",createdAt:"Mar 25, 2026 11:30 AM",createdBy:"Admin",company:"Sunrise Exports",contact:"Karthik S",phone:"+91 98123 45678",email:"karthik@sunriseexp.com",enquiryType:"Export",funnelType:"High Value",nextFollowUp:"2026-04-10",status:"Pending",stage:"Qualified",cityRegion:"Mumbai",deliveryDetails:"Port delivery",paymentTerms:"LC terms",products:[{desc:"Banarasi Sarees",category:"Sarees",qty:100,price:5000},{desc:"Bridal Lehenga",category:"Lehengas",qty:20,price:30000}],remarks:"Annual export contract possible. Logistics discussion needed.",quoteNo:"QT-2026-003",quoteQty:120,quoteAmount:1100000,quoteDesc:"Awaiting approval",billedAmount:null,billedDate:null},
+  {id:4,leadSource:"WhatsApp",createdAt:"Mar 20, 2026 09:15 AM",createdBy:"Vinodhini",company:"Meera Collections",contact:"Meera Nair",phone:"+91 99001 12233",email:"meera@meeracoll.com",enquiryType:"New Client",funnelType:"Normal",nextFollowUp:"2026-04-04",status:"Pending",stage:"New Lead",cityRegion:"Coimbatore",deliveryDetails:"",paymentTerms:"",products:[{desc:"Cotton Kurtis",category:"Kurtis",qty:60,price:600}],remarks:"New boutique, Coimbatore. High potential.",quoteNo:"QT-2026-004",quoteQty:60,quoteAmount:36000,quoteDesc:"Initial quote sent",billedAmount:null,billedDate:null},
+  {id:5,leadSource:"Owner",createdAt:"Mar 15, 2026 02:45 PM",createdBy:"Admin",company:"Apex Pharma Gifting",contact:"Suresh M",phone:"+91 99887 76655",email:"suresh@apexpharma.com",enquiryType:"Bulk Order",funnelType:"Premium",nextFollowUp:"2026-04-15",status:"Won",stage:"Won",cityRegion:"Hyderabad",deliveryDetails:"Office delivery",paymentTerms:"Annual contract",products:[{desc:"Corporate Sarees",category:"Sarees",qty:200,price:3500},{desc:"Accessory Kits",category:"Accessories",qty:200,price:2100}],remarks:"CEO contact, annual gifting contract.",quoteNo:"QT-2026-005",quoteQty:400,quoteAmount:1120000,quoteDesc:"Closed",billedAmount:1120000,billedDate:"2026-03-20"},
+  {id:6,leadSource:"Email",createdAt:"Mar 10, 2026 04:00 PM",createdBy:"Arjun Kumar",company:"Nila Bridal House",contact:"Nila Devi",phone:"+91 94445 67890",email:"nila@nilabridalhouse.com",enquiryType:"Custom Design",funnelType:"Premium",nextFollowUp:"2026-04-12",status:"Pending",stage:"Qualified",cityRegion:"Kochi",deliveryDetails:"",paymentTerms:"60% advance",products:[{desc:"Custom Lehenga",category:"Lehengas",qty:5,price:55000},{desc:"Designer Sarees",category:"Sarees",qty:8,price:12000}],remarks:"Bespoke only. Premium segment.",quoteNo:"QT-2026-006",quoteQty:13,quoteAmount:371000,quoteDesc:"Custom design quote under prep",billedAmount:null,billedDate:null},
+  {id:7,leadSource:"Website",createdAt:"Mar 05, 2026 10:30 AM",createdBy:"Priya Raj",company:"Tara Textiles",contact:"Tara Singh",phone:"+91 98321 09876",email:"tara@taratextiles.com",enquiryType:"Wholesale",funnelType:"Bulk",nextFollowUp:"2026-03-30",status:"Lost",stage:"New Lead",cityRegion:"Delhi",deliveryDetails:"",paymentTerms:"",products:[{desc:"Western Tops",category:"Western Wear",qty:100,price:750}],remarks:"Lost on price. May revisit Q3.",quoteNo:"QT-2026-007",quoteQty:100,quoteAmount:75000,quoteDesc:"Not accepted",billedAmount:null,billedDate:null},
 ];
 
 // ─── EXCEL EXPORT ─────────────────────────────────────────────────────────────
-// ① leadSource added to headers + row data
 function xls(data, name) {
   const e = v => String(v??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-  const H = ["#","Company","Lead Source","Contact","Phone","Email","Enquiry","Type","Stage","Follow-up","Status","Products","Quote No","Qty","Quote Amt","Billed Amt","Billed Date","Remarks","Created","By"];
+  // ② quoteLink removed, ③ new fields added
+  const H = ["#","Company","Lead Source","Contact","Phone","Email","Enquiry","Type","Stage","Follow-up","Status","City/Region","Delivery Details","Payment Terms","Products","Quote No","Qty","Quote Amt","Billed Amt","Billed Date","Remarks","Created","By"];
   const hRow = `<Row ss:StyleID="h">${H.map(h=>`<Cell><Data ss:Type="String">${e(h)}</Data></Cell>`).join("")}</Row>`;
   const rows = data.map((f,i)=>{
     const prod=(f.products||[]).map(p=>`${p.desc}(${p.category},×${p.qty},₹${p.price})`).join("|");
     return `<Row>${[
-      [i+1,"Number"],[f.company],[f.leadSource||""],[f.contact||""],[f.phone||""],[f.email||""],
-      [f.enquiryType||""],[f.funnelType||""],[f.stage||""],[f.nextFollowUp||""],[f.status],[prod],
+      [i+1,"Number"],[f.company||""],[f.leadSource||""],[f.contact||""],[f.phone||""],[f.email||""],
+      [f.enquiryType||""],[f.funnelType||""],[f.stage||""],[f.nextFollowUp||""],[f.status],
+      [f.cityRegion||""],[f.deliveryDetails||""],[f.paymentTerms||""],[prod],
       [f.quoteNo||""],[f.quoteQty||"",f.quoteQty?"Number":"String"],
       [f.quoteAmount||"",f.quoteAmount?"Number":"String"],
       [f.billedAmount||"",f.billedAmount?"Number":"String"],
@@ -183,10 +208,8 @@ function StatusPill({status,sm}) {
   );
 }
 
-// ① Lead Source pill — simple neutral chip
 function SourcePill({source}) {
   if (!source) return null;
-  // icon-like first char for quick scanning
   const icons = {WhatsApp:"💬", Email:"✉", Website:"🌐", Call:"📞", Owner:"👤", Other:"•"};
   return (
     <span style={{display:"inline-flex",alignItems:"center",gap:4,padding:"1px 7px",borderRadius:20,fontSize:10,fontWeight:500,background:"rgba(0,0,0,0.04)",color:T.inkSub,fontFamily:F,whiteSpace:"nowrap",border:`1px solid ${T.line}`}}>
@@ -219,6 +242,8 @@ const P={
   eye:    "M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8zm11-3a3 3 0 100 6 3 3 0 000-6z",
   cal:    "M8 2v4m8-4v4M3 8h18M5 4h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2z",
   pencil: "M15.232 5.232l3.536 3.536M9 11l6.5-6.5a2 2 0 012.828 2.828L11 14l-4 1 1-4z",
+  menu:   "M3 6h18M3 12h18M3 18h18",
+  msg:    "M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z",
 };
 
 function Avatar({name,size=32}) {
@@ -268,10 +293,10 @@ const inputSx = (err) => ({
   background:T.surface,outline:"none",boxSizing:"border-box",
   transition:"border-color .15s,box-shadow .15s",
 });
+
 const onfocus = e => { e.target.style.borderColor=T.brand; e.target.style.boxShadow=`0 0 0 3px rgba(91,59,232,.1)`; };
 const onblur  = e => { e.target.style.borderColor=T.lineMid; e.target.style.boxShadow="none"; };
 
-// Shared chevron background for all <select> elements
 const selectBg = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%236E6E80' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 7px center`;
 
 function FInput({label,value,onChange,placeholder,type="text",error,required,full=true,style:sx}) {
@@ -300,13 +325,12 @@ function FSelect({label,value,onChange,options,placeholder,full=true,required,er
   );
 }
 
-// ─── SECTION LABEL ────────────────────────────────────────────────────────────
 const SL = ({children}) => <div style={{fontSize:11,fontWeight:600,color:T.inkMuted,letterSpacing:"0.07em",textTransform:"uppercase",marginBottom:12,fontFamily:F}}>{children}</div>;
 
 // ─── LOGIN ────────────────────────────────────────────────────────────────────
+// ⑤ Removed show/hide password toggle and hint text
 function Login({users,onLogin}) {
   const [u,su]=useState(""); const [p,sp]=useState(""); const [err,se]=useState(""); const [load,sl]=useState(false);
-  const [show,ss]=useState(false);
 
   const go=()=>{
     if(!u||!p){se("Please fill in all fields.");return;}
@@ -345,15 +369,17 @@ function Login({users,onLogin}) {
                 Password
                 <span style={{color:T.brand,cursor:"pointer",fontSize:12,fontWeight:500}} onClick={()=>se("Contact your administrator to reset your password.")}>Forgot?</span>
               </label>
-              <div style={{position:"relative"}}>
-                <input type={show?"text":"password"} value={p} onChange={e=>sp(e.target.value)}
-                  onKeyDown={e=>e.key==="Enter"&&go()}
-                  placeholder="Enter password"
-                  style={{...inputSx(),paddingRight:36}} onFocus={onfocus} onBlur={onblur}/>
-                <button onClick={()=>ss(x=>!x)} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:T.inkMuted,display:"flex",padding:2}}>
-                  <Ic d={P.eye} sz={15} color="currentColor"/>
-                </button>
-              </div>
+              {/* ⑤ password type fixed, no toggle button */}
+              <input
+                type="password"
+                value={p}
+                onChange={e=>sp(e.target.value)}
+                onKeyDown={e=>e.key==="Enter"&&go()}
+                placeholder="Enter password"
+                style={{...inputSx()}}
+                onFocus={onfocus}
+                onBlur={onblur}
+              />
             </div>
 
             <button onClick={go} disabled={load}
@@ -370,17 +396,13 @@ function Login({users,onLogin}) {
             </button>
           </div>
         </div>
-
-        <p style={{textAlign:"center",fontSize:12,color:T.inkMuted,marginTop:20}}>
-          admin / admin123 &nbsp;·&nbsp; vinodhini / pass123
-        </p>
       </div>
     </div>
   );
 }
 
 // ─── SIDEBAR ──────────────────────────────────────────────────────────────────
-function Sidebar({active,set,user,onLogout}) {
+function Sidebar({active,set,user,onLogout,open,onClose}) {
   const nav=[
     {id:"dashboard",label:"Dashboard",icon:P.dash},
     {id:"pipeline", label:"Pipeline", icon:P.pipe},
@@ -392,65 +414,76 @@ function Sidebar({active,set,user,onLogout}) {
   ];
 
   return (
-    <div style={{width:200,minHeight:"100vh",background:T.sidebar,borderRight:`1px solid ${T.line}`,display:"flex",flexDirection:"column",flexShrink:0}}>
-      <div style={{padding:"18px 16px 14px",borderBottom:`1px solid ${T.line}`}}>
-        <div style={{display:"flex",alignItems:"center",gap:9}}>
-          <div style={{width:28,height:28,background:T.brand,borderRadius:7,display:"flex",alignItems:"center",justifyContent:"center"}}>
-            <Ic d={P.layers} sz={13} color="#fff" sw={2.2}/>
-          </div>
-          <div>
-            <div style={{fontSize:13,fontWeight:700,color:T.ink,letterSpacing:"-0.2px",lineHeight:1.2}}>Ekanta</div>
-            <div style={{fontSize:10,color:T.inkMuted,lineHeight:1}}>Design Studio</div>
+    <>
+      {/* Mobile overlay */}
+      {open&&<div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:199,display:"none"}} className="mobile-overlay"/>}
+      <div className={`ek-sidebar${open?" open":""}`} style={{width:200,minHeight:"100vh",background:T.sidebar,borderRight:`1px solid ${T.line}`,display:"flex",flexDirection:"column",flexShrink:0,position:"relative",zIndex:200}}>
+        <div style={{padding:"18px 16px 14px",borderBottom:`1px solid ${T.line}`}}>
+          <div style={{display:"flex",alignItems:"center",gap:9}}>
+            <div style={{width:28,height:28,background:T.brand,borderRadius:7,display:"flex",alignItems:"center",justifyContent:"center"}}>
+              <Ic d={P.layers} sz={13} color="#fff" sw={2.2}/>
+            </div>
+            <div>
+              <div style={{fontSize:13,fontWeight:700,color:T.ink,letterSpacing:"-0.2px",lineHeight:1.2}}>Ekanta</div>
+              <div style={{fontSize:10,color:T.inkMuted,lineHeight:1}}>Design Studio</div>
+            </div>
           </div>
         </div>
-      </div>
 
-      <nav style={{flex:1,padding:"8px 8px 0"}}>
-        <div style={{fontSize:10,fontWeight:600,color:T.inkMuted,letterSpacing:"0.08em",padding:"10px 8px 4px",textTransform:"uppercase"}}>Navigation</div>
-        {nav.map(item=>{
-          const a=active===item.id;
-          return (
-            <button key={item.id} onClick={()=>set(item.id)}
-              style={{display:"flex",alignItems:"center",gap:8,width:"100%",padding:"7px 8px",borderRadius:T.r.md,border:"none",background:a?"rgba(91,59,232,.06)":"transparent",color:a?T.brand:T.inkSub,fontFamily:F,fontSize:13,fontWeight:a?600:400,cursor:"pointer",marginBottom:1,transition:"all .12s",textAlign:"left",position:"relative"}}
-              onMouseEnter={e=>{if(!a){e.currentTarget.style.background=T.bg;e.currentTarget.style.color=T.ink;}}}
-              onMouseLeave={e=>{if(!a){e.currentTarget.style.background="transparent";e.currentTarget.style.color=T.inkSub;}}}>
-              {a&&<span style={{position:"absolute",left:0,top:"50%",transform:"translateY(-50%)",width:2,height:18,background:T.brand,borderRadius:"0 2px 2px 0"}}/>}
-              <Ic d={item.icon} sz={14} color={a?T.brand:T.inkSub}/>
-              {item.label}
+        <nav style={{flex:1,padding:"8px 8px 0"}}>
+          <div style={{fontSize:10,fontWeight:600,color:T.inkMuted,letterSpacing:"0.08em",padding:"10px 8px 4px",textTransform:"uppercase"}}>Navigation</div>
+          {nav.map(item=>{
+            const a=active===item.id;
+            return (
+              <button key={item.id} onClick={()=>{set(item.id);onClose&&onClose();}}
+                style={{display:"flex",alignItems:"center",gap:8,width:"100%",padding:"7px 8px",borderRadius:T.r.md,border:"none",background:a?"rgba(91,59,232,.06)":"transparent",color:a?T.brand:T.inkSub,fontFamily:F,fontSize:13,fontWeight:a?600:400,cursor:"pointer",marginBottom:1,transition:"all .12s",textAlign:"left",position:"relative"}}
+                onMouseEnter={e=>{if(!a){e.currentTarget.style.background=T.bg;e.currentTarget.style.color=T.ink;}}}
+                onMouseLeave={e=>{if(!a){e.currentTarget.style.background="transparent";e.currentTarget.style.color=T.inkSub;}}}>
+                {a&&<span style={{position:"absolute",left:0,top:"50%",transform:"translateY(-50%)",width:2,height:18,background:T.brand,borderRadius:"0 2px 2px 0"}}/>}
+                <Ic d={item.icon} sz={14} color={a?T.brand:T.inkSub}/>
+                {item.label}
+              </button>
+            );
+          })}
+        </nav>
+
+        <div style={{padding:"10px 8px 14px",borderTop:`1px solid ${T.line}`}}>
+          <div style={{display:"flex",alignItems:"center",gap:9,padding:"7px 8px",borderRadius:T.r.md}}>
+            <Avatar name={user.name} size={28}/>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:12,fontWeight:600,color:T.ink,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{user.name}</div>
+              <div style={{fontSize:10,color:T.inkMuted}}>{user.role}</div>
+            </div>
+            <button onClick={onLogout} title="Sign out"
+              style={{background:"none",border:"none",cursor:"pointer",color:T.inkMuted,display:"flex",padding:3,borderRadius:5,transition:"color .15s"}}
+              onMouseEnter={e=>e.currentTarget.style.color=T.ink}
+              onMouseLeave={e=>e.currentTarget.style.color=T.inkMuted}>
+              <Ic d={P.out} sz={13} color="currentColor"/>
             </button>
-          );
-        })}
-      </nav>
-
-      <div style={{padding:"10px 8px 14px",borderTop:`1px solid ${T.line}`}}>
-        <div style={{display:"flex",alignItems:"center",gap:9,padding:"7px 8px",borderRadius:T.r.md}}>
-          <Avatar name={user.name} size={28}/>
-          <div style={{flex:1,minWidth:0}}>
-            <div style={{fontSize:12,fontWeight:600,color:T.ink,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{user.name}</div>
-            <div style={{fontSize:10,color:T.inkMuted}}>{user.role}</div>
           </div>
-          <button onClick={onLogout} title="Sign out"
-            style={{background:"none",border:"none",cursor:"pointer",color:T.inkMuted,display:"flex",padding:3,borderRadius:5,transition:"color .15s"}}
-            onMouseEnter={e=>e.currentTarget.style.color=T.ink}
-            onMouseLeave={e=>e.currentTarget.style.color=T.inkMuted}>
-            <Ic d={P.out} sz={13} color="currentColor"/>
-          </button>
         </div>
       </div>
-    </div>
+    </>
   );
 }
 
 // ─── TOPBAR ───────────────────────────────────────────────────────────────────
-function Topbar({title,sub,search,setSearch,user,onAdd,onExportAll,onExportFiltered,fLen,aLen}) {
+function Topbar({title,sub,search,setSearch,user,onAdd,onExportAll,onExportFiltered,fLen,aLen,onMenuToggle}) {
   return (
-    <div style={{background:T.surface,borderBottom:`1px solid ${T.line}`,padding:"0 24px"}}>
+    <div style={{background:T.surface,borderBottom:`1px solid ${T.line}`,padding:"0 16px"}}>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",height:56}}>
-        <div style={{display:"flex",alignItems:"center",gap:16,flex:1}}>
+        <div style={{display:"flex",alignItems:"center",gap:10,flex:1}}>
+          {/* ⑥ Mobile hamburger */}
+          <button onClick={onMenuToggle} className="ek-mobile-menu"
+            style={{background:"none",border:"none",cursor:"pointer",color:T.inkSub,display:"none",padding:4,borderRadius:6}}
+            onMouseEnter={e=>e.currentTarget.style.color=T.ink}
+            onMouseLeave={e=>e.currentTarget.style.color=T.inkSub}>
+            <Ic d={P.menu} sz={18} color="currentColor"/>
+          </button>
           <div>
             <h1 style={{fontSize:15,fontWeight:600,color:T.ink,letterSpacing:"-0.2px",margin:0,fontFamily:F}}>{title}</h1>
           </div>
-          <div style={{display:"flex",alignItems:"center",gap:8,background:T.bg,border:`1px solid ${T.line}`,borderRadius:T.r.md,padding:"6px 11px",minWidth:220,maxWidth:320,flex:1}}>
+          <div className="ek-topbar-search" style={{display:"flex",alignItems:"center",gap:8,background:T.bg,border:`1px solid ${T.line}`,borderRadius:T.r.md,padding:"6px 11px",minWidth:220,maxWidth:320,flex:1}}>
             <Ic d={P.search} sz={13} color={T.inkMuted}/>
             <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search funnels…"
               style={{border:"none",background:"transparent",outline:"none",fontSize:13,color:T.ink,fontFamily:F,width:"100%"}}/>
@@ -458,7 +491,7 @@ function Topbar({title,sub,search,setSearch,user,onAdd,onExportAll,onExportFilte
           </div>
         </div>
 
-        <div style={{display:"flex",gap:8,alignItems:"center",marginLeft:16}}>
+        <div style={{display:"flex",gap:6,alignItems:"center",marginLeft:12,flexWrap:"wrap"}}>
           {FULL.includes(user.role)&&(
             <>
               <Btn ghost sm icon={P.dl} label={`Filtered (${fLen})`} onClick={onExportFiltered}/>
@@ -497,7 +530,7 @@ function Stats({funnels}) {
   ];
 
   return (
-    <div style={{display:"grid",gridTemplateColumns:"repeat(6,1fr)",gap:12,padding:"20px 24px 0"}}>
+    <div className="ek-stats-grid" style={{display:"grid",gridTemplateColumns:"repeat(6,1fr)",gap:12,padding:"20px 24px 0"}}>
       {cards.map((c,i)=>(
         <div key={i} style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:T.r.lg,padding:"16px 18px",boxShadow:T.shadowSm,animation:`fadeUp .25s ease ${i*.04}s both`}}>
           <div style={{fontSize:11,fontWeight:500,color:T.inkMuted,letterSpacing:"0.04em",marginBottom:8,fontFamily:F}}>{c.label}</div>
@@ -513,7 +546,6 @@ function Stats({funnels}) {
 }
 
 // ─── FILTER BAR ───────────────────────────────────────────────────────────────
-// ② descFilter added — text input, case-insensitive contains search
 function FilterBar({fil,setF,reset}) {
   const sel=(val,key,opts)=>(
     <select value={val} onChange={e=>setF(key,e.target.value)}
@@ -529,7 +561,6 @@ function FilterBar({fil,setF,reset}) {
     </label>
   );
 
-  // ② any check includes descFilter and leadSource
   const any=fil.status||fil.funnelType||fil.enquiryType||fil.leadSource||fil.descFilter||fil.missed||fil.todayF||fil.upcoming;
 
   return (
@@ -544,10 +575,8 @@ function FilterBar({fil,setF,reset}) {
       {sel(fil.status,"status",STATUS)}
       {sel(fil.funnelType,"funnelType",FTYPES)}
       {sel(fil.enquiryType,"enquiryType",ENQS)}
-      {/* ① Lead Source filter */}
       {sel(fil.leadSource,"leadSource",LEAD_SOURCES)}
       <div style={{width:1,height:14,background:T.line}}/>
-      {/* ② Description search input */}
       <div style={{display:"flex",alignItems:"center",gap:7,background:T.bg,border:`1px solid ${T.line}`,borderRadius:T.r.md,padding:"4px 10px",minWidth:180}}>
         <Ic d={P.search} sz={12} color={T.inkMuted}/>
         <input
@@ -567,7 +596,6 @@ function FilterBar({fil,setF,reset}) {
 }
 
 // ─── TABLE ────────────────────────────────────────────────────────────────────
-// ① leadSource shown as a small pill under company name
 function Table({rows,user,onView,onEdit,onDelete}) {
   if(!rows.length) return (
     <div style={{textAlign:"center",padding:"72px 24px",fontFamily:F}}>
@@ -615,9 +643,8 @@ function Table({rows,user,onView,onEdit,onDelete}) {
                 onMouseEnter={e=>e.currentTarget.style.background=T.bg}
                 onMouseLeave={e=>e.currentTarget.style.background=T.surface}>
                 <td style={{padding:"0 14px",height:56,fontSize:11,color:T.inkMuted,fontWeight:600,verticalAlign:"middle"}}>{i+1}</td>
-                {/* ① company cell: name + source pill */}
                 <td style={{padding:"0 14px",verticalAlign:"middle",overflow:"hidden"}}>
-                  <div style={{fontSize:13,fontWeight:600,color:T.ink,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{f.company}</div>
+                  <div style={{fontSize:13,fontWeight:600,color:T.ink,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{f.company||"—"}</div>
                   <div style={{display:"flex",alignItems:"center",gap:5,marginTop:3}}>
                     <span style={{fontSize:10,color:T.inkMuted}}>{f.createdBy}</span>
                     {f.leadSource&&<SourcePill source={f.leadSource}/>}
@@ -669,7 +696,6 @@ function Table({rows,user,onView,onEdit,onDelete}) {
 }
 
 // ─── PIPELINE ─────────────────────────────────────────────────────────────────
-// ③ stageDescs + onStageDescChange added for custom per-stage notes
 function Pipeline({funnels,user,onView,onStageChange,stageDescs,onStageDescChange}) {
   const byStage=useMemo(()=>{
     const m={};STAGES.forEach(s=>{m[s]=funnels.filter(f=>(f.stage||"New Lead")===s);});return m;
@@ -683,7 +709,6 @@ function Pipeline({funnels,user,onView,onStageChange,stageDescs,onStageDescChang
   };
   const amtFor=s=>byStage[s]?.reduce((a,f)=>a+(Number(f.quoteAmount)||0),0)||0;
 
-  // ③ per-stage inline description editor state
   const [editingStage,setEditingStage]=useState(null);
   const [draftDesc,setDraftDesc]=useState("");
   const descRef=useRef(null);
@@ -701,7 +726,7 @@ function Pipeline({funnels,user,onView,onStageChange,stageDescs,onStageDescChang
 
   return (
     <div style={{padding:"20px 24px",overflowX:"auto"}}>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,minWidth:760}}>
+      <div className="ek-pipeline-grid" style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,minWidth:760}}>
         {STAGES.map((stage,si)=>{
           const sc=stageColor[stage];
           const cards=byStage[stage]||[];
@@ -711,7 +736,6 @@ function Pipeline({funnels,user,onView,onStageChange,stageDescs,onStageDescChang
 
           return (
             <div key={stage} style={{display:"flex",flexDirection:"column",gap:8,animation:`fadeUp .3s ease ${si*.06}s both`}}>
-              {/* ③ Column header with custom description */}
               <div style={{marginBottom:2}}>
                 <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 2px",marginBottom:4}}>
                   <div style={{display:"flex",alignItems:"center",gap:7}}>
@@ -721,7 +745,6 @@ function Pipeline({funnels,user,onView,onStageChange,stageDescs,onStageDescChang
                   <div style={{display:"flex",alignItems:"center",gap:6}}>
                     {amt>0&&<span style={{fontSize:11,color:T.inkSub,fontFamily:F}}>{big(amt)}</span>}
                     <span style={{fontSize:11,fontWeight:600,color:T.inkMuted,background:T.bg,border:`1px solid ${T.line}`,borderRadius:10,padding:"0 7px",fontFamily:F}}>{cards.length}</span>
-                    {/* ③ Edit description button — visible only to full-access users */}
                     {FULL.includes(user.role)&&!isEditing&&(
                       <button onClick={()=>openEdit(stage)} title="Edit stage description"
                         style={{background:"none",border:"none",cursor:"pointer",color:T.inkMuted,padding:"2px 3px",borderRadius:4,display:"flex",transition:"color .12s"}}
@@ -733,7 +756,6 @@ function Pipeline({funnels,user,onView,onStageChange,stageDescs,onStageDescChang
                   </div>
                 </div>
 
-                {/* ③ Description display / editor */}
                 {isEditing ? (
                   <div style={{background:T.surface,border:`1px solid ${T.brand}`,borderRadius:T.r.md,padding:"8px 10px",boxShadow:`0 0 0 3px rgba(91,59,232,.1)`,marginBottom:4}}>
                     <textarea
@@ -766,23 +788,20 @@ function Pipeline({funnels,user,onView,onStageChange,stageDescs,onStageDescChang
                 )}
               </div>
 
-              {/* Drop zone */}
               <div style={{background:T.bg,border:`1px dashed ${T.line}`,borderRadius:T.r.lg,display:cards.length===0?"flex":"none",alignItems:"center",justifyContent:"center",padding:"20px 12px",fontSize:11,color:T.inkMuted,fontFamily:F}}>
                 No leads
               </div>
 
-              {/* Deal cards */}
               {cards.map(f=>(
                 <div key={f.id} onClick={()=>onView(f)}
                   style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:T.r.lg,padding:"14px 14px",cursor:"pointer",transition:"border-color .15s,transform .12s,box-shadow .15s",boxShadow:T.shadowSm}}
                   onMouseEnter={e=>{e.currentTarget.style.borderColor=T.lineStrong;e.currentTarget.style.transform="translateY(-1px)";e.currentTarget.style.boxShadow=T.shadowMd;}}
                   onMouseLeave={e=>{e.currentTarget.style.borderColor=T.line;e.currentTarget.style.transform="translateY(0)";e.currentTarget.style.boxShadow=T.shadowSm;}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:4}}>
-                    <div style={{fontSize:13,fontWeight:600,color:T.ink,fontFamily:F,lineHeight:1.3,flex:1,marginRight:8,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{f.company}</div>
+                    <div style={{fontSize:13,fontWeight:600,color:T.ink,fontFamily:F,lineHeight:1.3,flex:1,marginRight:8,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{f.company||"—"}</div>
                     {(f.funnelType==="High Value"||f.funnelType==="Premium")&&<StatusPill status={f.funnelType} sm/>}
                   </div>
                   <div style={{fontSize:11,color:T.inkSub,marginBottom:6,fontFamily:F}}>{f.contact||"—"}</div>
-                  {/* ① Source pill on pipeline card */}
                   {f.leadSource&&<div style={{marginBottom:7}}><SourcePill source={f.leadSource}/></div>}
                   {f.products?.length>0&&<div style={{fontSize:11,color:T.inkMuted,marginBottom:10,fontFamily:F}}>{[...new Set(f.products.map(p=>p.category))].filter(Boolean).slice(0,2).join(", ")}</div>}
                   <div style={{height:2,background:T.bg,borderRadius:2,marginBottom:10,overflow:"hidden"}}>
@@ -846,13 +865,11 @@ function Analytics({funnels}) {
 
   const byCat=CATS.map(c=>({c,n:(funnels.flatMap(f=>f.products||[])).filter(p=>p.category===c).reduce((a,p)=>a+(Number(p.qty)||0),0)})).sort((a,b)=>b.n-a.n);
   const maxCat=Math.max(...byCat.map(x=>x.n),1);
-
-  // ① Lead Source breakdown
   const bySrc=LEAD_SOURCES.map(s=>({s,n:funnels.filter(f=>f.leadSource===s).length})).filter(x=>x.n>0);
 
   return (
     <div style={{padding:"20px 24px",display:"grid",gap:16}}>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:16}}>
+      <div className="ek-analytics-3col" style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:16}}>
         <Card title="Win rate">
           <div style={{textAlign:"center",padding:"8px 0"}}>
             <div style={{fontSize:52,fontWeight:700,color:wr>=50?T.won.dot:T.pending.dot,fontFamily:F,letterSpacing:"-2px",lineHeight:1}}>{wr}%</div>
@@ -882,7 +899,7 @@ function Analytics({funnels}) {
         </Card>
       </div>
 
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:16}}>
+      <div className="ek-analytics-3col" style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:16}}>
         <Card title="Leads by type">
           <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
             {FTYPES.map((t,i)=>{
@@ -898,7 +915,6 @@ function Analytics({funnels}) {
           </div>
         </Card>
 
-        {/* ① Lead Source breakdown in analytics */}
         <Card title="Leads by source">
           {bySrc.length===0
             ? <div style={{fontSize:12,color:T.inkMuted,fontFamily:F}}>No source data yet.</div>
@@ -944,7 +960,7 @@ function Team({users,onSave}) {
 
   const rc={"CEO":T.high,"Manager":T.won,"Sales Coordinator":T.new,"CRE":T.pending};
   return (
-    <div style={{padding:"20px 24px",display:"grid",gridTemplateColumns:"360px 1fr",gap:20}}>
+    <div className="ek-team-grid" style={{padding:"20px 24px",display:"grid",gridTemplateColumns:"360px 1fr",gap:20}}>
       <div style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:T.r.lg,padding:22,boxShadow:T.shadowSm}}>
         <div style={{fontSize:14,fontWeight:600,color:T.ink,marginBottom:3,fontFamily:F}}>Add team member</div>
         <div style={{fontSize:12,color:T.inkSub,marginBottom:18,fontFamily:F}}>Access granted immediately upon creation</div>
@@ -990,27 +1006,31 @@ function Team({users,onSave}) {
 }
 
 // ─── FUNNEL FORM ──────────────────────────────────────────────────────────────
-// ① leadSource field added — required, with validation
+// ① company optional, ② quoteLink removed, ③ new fields added
 function FunnelForm({onClose,onSave,existing}) {
   const blank={
     company:"",contact:"",phone:"",email:"",
     enquiryType:"",funnelType:"",
-    leadSource:"",    // ① NEW
+    leadSource:"",
+    cityRegion:"",         // ③ NEW
     nextFollowUp:"",stage:"New Lead",
     products:[{desc:"",category:"",qty:"",price:""}],
-    remarks:"",quoteNo:"",quoteQty:"",quoteAmount:"",quoteLink:"",quoteDesc:"",
+    remarks:"",
+    deliveryDetails:"",    // ③ NEW
+    paymentTerms:"",       // ③ NEW
+    quoteNo:"",quoteQty:"",quoteAmount:"",quoteDesc:"",
+    // ② quoteLink removed
   };
   const [form,setForm]=useState(existing?{...blank,...existing,products:existing.products?.length?existing.products:blank.products}:blank);
   const [errs,setErrs]=useState({});
   const set=(k,v)=>setForm(f=>({...f,[k]:v}));
   const sp=(i,k,v)=>{const p=[...form.products];p[i]={...p[i],[k]:v};set("products",p);};
 
-  // ① leadSource added to validation
+  // ① company is now optional — removed from required validation
   const val=()=>{
     const e={};
-    if(!form.company.trim()) e.company="Required";
-    if(!form.leadSource)     e.leadSource="Please select a lead source";
-    if(!form.nextFollowUp)   e.nfu="Required";
+    if(!form.leadSource)   e.leadSource="Please select a lead source";
+    if(!form.nextFollowUp) e.nfu="Required";
     setErrs(e);
     return !Object.keys(e).length;
   };
@@ -1019,7 +1039,7 @@ function FunnelForm({onClose,onSave,existing}) {
   const prodTotal=(form.products||[]).reduce((a,p)=>a+(Number(p.qty)*Number(p.price)||0),0);
 
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.35)",zIndex:2000,display:"flex",alignItems:"center",justifyContent:"center",padding:24,backdropFilter:"blur(2px)"}}
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.35)",zIndex:2000,display:"flex",alignItems:"center",justifyContent:"center",padding:16,backdropFilter:"blur(2px)"}}
       onClick={onClose}>
       <div style={{background:T.surface,borderRadius:T.r["2xl"],width:"100%",maxWidth:720,maxHeight:"90vh",overflowY:"auto",boxShadow:T.shadowXl,animation:"fadeUp .2s ease"}}
         onClick={e=>e.stopPropagation()}>
@@ -1028,7 +1048,7 @@ function FunnelForm({onClose,onSave,existing}) {
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"20px 24px 16px",borderBottom:`1px solid ${T.line}`,position:"sticky",top:0,background:T.surface,zIndex:1,borderRadius:`${T.r["2xl"]} ${T.r["2xl"]} 0 0`}}>
           <div>
             <h2 style={{fontSize:16,fontWeight:700,color:T.ink,fontFamily:F,margin:"0 0 2px"}}>{existing?"Edit funnel":"New funnel"}</h2>
-            <p style={{margin:0,fontSize:12,color:T.inkSub,fontFamily:F}}>{existing?`Editing ${existing.company}`:"Add a new sales lead"}</p>
+            <p style={{margin:0,fontSize:12,color:T.inkSub,fontFamily:F}}>{existing?`Editing ${existing.company||"funnel"}`:"Add a new sales lead"}</p>
           </div>
           <button onClick={onClose} style={{width:30,height:30,border:`1px solid ${T.line}`,borderRadius:T.r.md,background:T.bg,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
             <Ic d={P.close} sz={13} color={T.inkSub}/>
@@ -1041,23 +1061,24 @@ function FunnelForm({onClose,onSave,existing}) {
           <section>
             <SL>Contact details</SL>
             <div style={{display:"flex",flexDirection:"column",gap:12}}>
-              <FInput label="Company name" required value={form.company} onChange={e=>set("company",e.target.value)} placeholder="e.g. Bridal Bliss Boutique" error={errs.company}/>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
+              {/* ① company not required */}
+              <FInput label="Company name" value={form.company} onChange={e=>set("company",e.target.value)} placeholder="e.g. Bridal Bliss Boutique"/>
+              <div className="ek-form-3col" style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
                 <FInput label="Contact person" value={form.contact} onChange={e=>set("contact",e.target.value)} placeholder="Full name"/>
                 <FInput label="Phone" value={form.phone} onChange={e=>set("phone",e.target.value)} placeholder="+91 98765 43210"/>
                 <FInput label="Email" type="email" value={form.email} onChange={e=>set("email",e.target.value)} placeholder="email@company.com"/>
               </div>
+              {/* ③ City/Region field */}
+              <FInput label="City / Region" value={form.cityRegion} onChange={e=>set("cityRegion",e.target.value)} placeholder="e.g. Chennai, Tamil Nadu"/>
             </div>
           </section>
 
-          {/* Funnel details — now 5 cols to fit Lead Source */}
+          {/* Funnel details */}
           <section>
             <SL>Funnel details</SL>
-            {/* Row 1: Enquiry Type · Funnel Type · Lead Source */}
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:10}}>
+            <div className="ek-form-3col" style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:10}}>
               <FSelect label="Enquiry type" value={form.enquiryType} onChange={e=>set("enquiryType",e.target.value)} options={ENQS}/>
               <FSelect label="Funnel type"  value={form.funnelType}  onChange={e=>set("funnelType",e.target.value)}  options={FTYPES}/>
-              {/* ① Lead Source — required */}
               <FSelect
                 label="Lead source"
                 required
@@ -1068,8 +1089,7 @@ function FunnelForm({onClose,onSave,existing}) {
                 error={errs.leadSource}
               />
             </div>
-            {/* Row 2: Stage · Next Follow-up */}
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+            <div className="ek-form-2col" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
               <FSelect label="Stage" value={form.stage} onChange={e=>set("stage",e.target.value)} options={STAGES}/>
               <div style={{display:"flex",flexDirection:"column",gap:5}}>
                 <label style={{fontSize:12,fontWeight:500,color:T.inkSub,fontFamily:F}}>Next follow-up<span style={{color:"#DC2626",marginLeft:2}}>*</span></label>
@@ -1121,16 +1141,32 @@ function FunnelForm({onClose,onSave,existing}) {
               style={{...inputSx(),padding:"9px 11px",resize:"vertical",lineHeight:1.5}} onFocus={onfocus} onBlur={onblur}/>
           </section>
 
-          {/* Quotation */}
+          {/* ③ Delivery & Payment */}
+          <section>
+            <SL>Delivery & Payment</SL>
+            <div className="ek-form-2col" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+              <div style={{display:"flex",flexDirection:"column",gap:5}}>
+                <label style={{fontSize:12,fontWeight:500,color:T.inkSub,fontFamily:F}}>Delivery details</label>
+                <textarea value={form.deliveryDetails} onChange={e=>set("deliveryDetails",e.target.value)} placeholder="e.g. Delivery by Apr 20, doorstep…" rows={2}
+                  style={{...inputSx(),padding:"9px 11px",resize:"vertical",lineHeight:1.5}} onFocus={onfocus} onBlur={onblur}/>
+              </div>
+              <div style={{display:"flex",flexDirection:"column",gap:5}}>
+                <label style={{fontSize:12,fontWeight:500,color:T.inkSub,fontFamily:F}}>Payment terms</label>
+                <textarea value={form.paymentTerms} onChange={e=>set("paymentTerms",e.target.value)} placeholder="e.g. 50% advance, balance on delivery…" rows={2}
+                  style={{...inputSx(),padding:"9px 11px",resize:"vertical",lineHeight:1.5}} onFocus={onfocus} onBlur={onblur}/>
+              </div>
+            </div>
+          </section>
+
+          {/* Quotation — ② quoteLink removed */}
           <section>
             <SL>Initial quotation</SL>
             <div style={{display:"flex",flexDirection:"column",gap:12}}>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
+              <div className="ek-form-3col" style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
                 <FInput label="Quote number" value={form.quoteNo} onChange={e=>set("quoteNo",e.target.value)} placeholder="QT-2026-XXX"/>
                 <FInput label="Quantity" type="number" value={form.quoteQty} onChange={e=>set("quoteQty",e.target.value)} placeholder="0"/>
                 <FInput label="Amount (₹)" type="number" value={form.quoteAmount} onChange={e=>set("quoteAmount",e.target.value)} placeholder="0"/>
               </div>
-              <FInput label="Document link" type="url" value={form.quoteLink} onChange={e=>set("quoteLink",e.target.value)} placeholder="https://…"/>
               <div>
                 <label style={{fontSize:12,fontWeight:500,color:T.inkSub,marginBottom:5,display:"block",fontFamily:F}}>Description</label>
                 <textarea value={form.quoteDesc} onChange={e=>set("quoteDesc",e.target.value)} placeholder="Quote notes…" rows={2}
@@ -1151,35 +1187,51 @@ function FunnelForm({onClose,onSave,existing}) {
 }
 
 // ─── VIEW DRAWER ──────────────────────────────────────────────────────────────
-// ① leadSource shown in Funnel section
-function ViewDrawer({funnel,onClose,onEdit,onStatusChange,user}) {
+// ② quoteLink removed, ③ new fields added, ④ Audit Comments added
+function ViewDrawer({funnel,onClose,onEdit,onStatusChange,user,comments,onAddComment}) {
   const [status,setStatus]=useState(funnel.status);
   const tot=(funnel.products||[]).reduce((a,p)=>a+(Number(p.qty)*Number(p.price)||0),0);
   const sc=T[status.toLowerCase()]||T.drop;
   const doStatus=s=>{setStatus(s);onStatusChange(funnel.id,s);};
 
+  // ④ Audit comment state
+  const [commentText,setCommentText]=useState("");
+  const canComment=FULL.includes(user.role);
+
+  const submitComment=()=>{
+    if(!commentText.trim()) return;
+    onAddComment(funnel.id,{
+      text:commentText.trim(),
+      author:user.name,
+      role:user.role,
+      time:stamp(),
+    });
+    setCommentText("");
+  };
+
   const Row=({l,v,mono})=>(
-    <div style={{display:"grid",gridTemplateColumns:"130px 1fr",gap:8,padding:"8px 0",borderBottom:`1px solid ${T.line}`}}>
+    <div style={{display:"grid",gridTemplateColumns:"140px 1fr",gap:8,padding:"8px 0",borderBottom:`1px solid ${T.line}`}}>
       <dt style={{fontSize:11,fontWeight:500,color:T.inkMuted,fontFamily:F}}>{l}</dt>
       <dd style={{fontSize:13,color:T.ink,fontFamily:mono?"'SF Mono',monospace":F,wordBreak:"break-all"}}>{v||"—"}</dd>
     </div>
   );
   const Sec=({t})=><div style={{fontSize:10,fontWeight:600,color:T.inkMuted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:10,marginTop:4,fontFamily:F}}>{t}</div>;
 
+  const roleColor={"CEO":T.high,"Manager":T.won,"Sales Coordinator":T.new,"CRE":T.pending};
+
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.3)",zIndex:2000,display:"flex",justifyContent:"flex-end",backdropFilter:"blur(1px)"}}
       onClick={onClose}>
-      <div style={{background:T.surface,width:"100%",maxWidth:520,height:"100%",overflowY:"auto",boxShadow:"-8px 0 40px rgba(0,0,0,.12)",animation:"slideRight .22s ease",display:"flex",flexDirection:"column"}}
+      <div style={{background:T.surface,width:"100%",maxWidth:540,height:"100%",overflowY:"auto",boxShadow:"-8px 0 40px rgba(0,0,0,.12)",animation:"slideRight .22s ease",display:"flex",flexDirection:"column"}}
         onClick={e=>e.stopPropagation()}>
 
         {/* Header */}
         <div style={{padding:"20px 22px 16px",borderBottom:`1px solid ${T.line}`,position:"sticky",top:0,background:T.surface,zIndex:1}}>
           <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:12}}>
             <div style={{flex:1,marginRight:12}}>
-              <h2 style={{fontSize:17,fontWeight:700,color:T.ink,fontFamily:F,margin:"0 0 3px",letterSpacing:"-0.3px"}}>{funnel.company}</h2>
+              <h2 style={{fontSize:17,fontWeight:700,color:T.ink,fontFamily:F,margin:"0 0 3px",letterSpacing:"-0.3px"}}>{funnel.company||"(No company)"}</h2>
               <div style={{display:"flex",alignItems:"center",gap:8}}>
                 <p style={{margin:0,fontSize:11,color:T.inkMuted,fontFamily:F}}>{funnel.createdAt} · {funnel.createdBy}</p>
-                {/* ① Source pill in drawer header */}
                 {funnel.leadSource&&<SourcePill source={funnel.leadSource}/>}
               </div>
             </div>
@@ -1190,8 +1242,7 @@ function ViewDrawer({funnel,onClose,onEdit,onStatusChange,user}) {
               </button>
             </div>
           </div>
-          {/* Status selector */}
-          <div style={{display:"flex",gap:6}}>
+          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
             {STATUS.map(s=>{
               const c=T[s.toLowerCase()]||T.drop;
               const a=status===s;
@@ -1208,18 +1259,24 @@ function ViewDrawer({funnel,onClose,onEdit,onStatusChange,user}) {
         {/* Body */}
         <div style={{padding:"18px 22px",flex:1}}>
           <Sec t="Contact"/>
-          <dl><Row l="Contact" v={funnel.contact}/><Row l="Phone" v={funnel.phone}/><Row l="Email" v={funnel.email}/></dl>
+          <dl>
+            <Row l="Contact" v={funnel.contact}/>
+            <Row l="Phone" v={funnel.phone}/>
+            <Row l="Email" v={funnel.email}/>
+            {funnel.cityRegion&&<Row l="City / Region" v={funnel.cityRegion}/>}
+          </dl>
           <div style={{height:18}}/>
+
           <Sec t="Funnel"/>
           <dl>
             <Row l="Enquiry type"   v={funnel.enquiryType}/>
             <Row l="Funnel type"    v={funnel.funnelType}/>
-            {/* ① Lead source row */}
             <Row l="Lead source"    v={funnel.leadSource}/>
             <Row l="Stage"          v={funnel.stage}/>
             <Row l="Next follow-up" v={funnel.nextFollowUp}/>
           </dl>
           <div style={{height:18}}/>
+
           <Sec t="Products"/>
           <div style={{border:`1px solid ${T.line}`,borderRadius:T.r.lg,overflow:"hidden",marginBottom:18}}>
             <div style={{display:"grid",gridTemplateColumns:"2fr 1fr .7fr 1fr 1fr",padding:"7px 14px",background:T.bg}}>
@@ -1236,7 +1293,21 @@ function ViewDrawer({funnel,onClose,onEdit,onStatusChange,user}) {
             ))}
             {tot>0&&<div style={{display:"flex",justifyContent:"flex-end",padding:"8px 14px",borderTop:`1px solid ${T.lineMid}`,fontSize:13,fontWeight:700,color:T.ink,fontFamily:F}}>Total: {inr(tot)}</div>}
           </div>
+
           {funnel.remarks&&<><Sec t="Remarks"/><div style={{background:T.bg,padding:"10px 14px",borderRadius:T.r.md,fontSize:13,color:T.ink,fontFamily:F,lineHeight:1.6,marginBottom:18}}>{funnel.remarks}</div></>}
+
+          {/* ③ Delivery & Payment */}
+          {(funnel.deliveryDetails||funnel.paymentTerms)&&(
+            <>
+              <Sec t="Delivery & Payment"/>
+              <dl>
+                {funnel.deliveryDetails&&<Row l="Delivery details" v={funnel.deliveryDetails}/>}
+                {funnel.paymentTerms&&<Row l="Payment terms" v={funnel.paymentTerms}/>}
+              </dl>
+              <div style={{height:18}}/>
+            </>
+          )}
+
           <Sec t="Quotation"/>
           <dl>
             <Row l="Quote no." v={funnel.quoteNo} mono/>
@@ -1244,11 +1315,69 @@ function ViewDrawer({funnel,onClose,onEdit,onStatusChange,user}) {
             <Row l="Amount"    v={inr(funnel.quoteAmount)}/>
             {funnel.quoteDesc&&<Row l="Description" v={funnel.quoteDesc}/>}
           </dl>
-          {(funnel.billedAmount||funnel.billedDate)&&<>
-            <div style={{height:18}}/>
-            <Sec t="Billing"/>
-            <dl><Row l="Billed amount" v={inr(funnel.billedAmount)}/><Row l="Billed date" v={funnel.billedDate}/></dl>
-          </>}
+
+          {(funnel.billedAmount||funnel.billedDate)&&(
+            <>
+              <div style={{height:18}}/>
+              <Sec t="Billing"/>
+              <dl>
+                <Row l="Billed amount" v={inr(funnel.billedAmount)}/>
+                <Row l="Billed date"   v={funnel.billedDate}/>
+              </dl>
+            </>
+          )}
+
+          {/* ④ AUDIT COMMENTS */}
+          <div style={{height:24}}/>
+          <div style={{borderTop:`2px solid ${T.line}`,paddingTop:20}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:16}}>
+              <Ic d={P.msg} sz={14} color={T.brand}/>
+              <span style={{fontSize:13,fontWeight:600,color:T.ink,fontFamily:F}}>Audit Comments</span>
+              {comments.length>0&&<span style={{fontSize:11,fontWeight:500,background:T.brandSubtle,color:T.brand,padding:"1px 8px",borderRadius:10,fontFamily:F}}>{comments.length}</span>}
+            </div>
+
+            {/* Comment input — only for CEO/Manager */}
+            {canComment&&(
+              <div style={{marginBottom:16}}>
+                <textarea
+                  value={commentText}
+                  onChange={e=>setCommentText(e.target.value)}
+                  placeholder="Write your audit comment…"
+                  rows={3}
+                  style={{...inputSx(),padding:"10px 12px",resize:"vertical",lineHeight:1.6,width:"100%",boxSizing:"border-box"}}
+                  onFocus={onfocus} onBlur={onblur}
+                />
+                <div style={{display:"flex",justifyContent:"flex-end",marginTop:8}}>
+                  <Btn primary sm icon={P.check} label="Save comment" onClick={submitComment} disabled={!commentText.trim()}/>
+                </div>
+              </div>
+            )}
+
+            {/* Comments list */}
+            {comments.length===0
+              ? <div style={{textAlign:"center",padding:"20px 0",fontSize:12,color:T.inkMuted,fontFamily:F}}>
+                  No audit comments yet.
+                </div>
+              : <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                  {[...comments].reverse().map((c,i)=>{
+                    const rc=roleColor[c.role]||T.drop;
+                    return (
+                      <div key={i} style={{background:T.bg,border:`1px solid ${T.line}`,borderRadius:T.r.lg,padding:"12px 14px"}}>
+                        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                          <Avatar name={c.author} size={24}/>
+                          <div style={{flex:1}}>
+                            <span style={{fontSize:12,fontWeight:600,color:T.ink,fontFamily:F}}>{c.author}</span>
+                            <span style={{marginLeft:6,fontSize:10,fontWeight:500,padding:"1px 7px",borderRadius:10,background:rc.bg,color:rc.text,fontFamily:F}}>{c.role}</span>
+                          </div>
+                          <span style={{fontSize:10,color:T.inkMuted,fontFamily:F,whiteSpace:"nowrap"}}>{c.time}</span>
+                        </div>
+                        <p style={{margin:0,fontSize:13,color:T.ink,fontFamily:F,lineHeight:1.6}}>{c.text}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+            }
+          </div>
         </div>
       </div>
     </div>
@@ -1260,12 +1389,18 @@ function Shell({user,users,onLogout,onUsersChange}) {
   const [funnels,setFunnels]=useState(SEED_FUNNELS);
   const [view,setView]=useState("dashboard");
   const [search,setSearch]=useState("");
+  const [sidebarOpen,setSidebarOpen]=useState(false); // ⑥ mobile sidebar
 
-  // ① leadSource filter + ② descFilter added to initial state
+  // ④ Audit comments — stored per funnel id
+  const [funnelComments,setFunnelComments]=useState({});
+  const addComment=(funnelId,comment)=>{
+    setFunnelComments(prev=>({...prev,[funnelId]:[...(prev[funnelId]||[]),comment]}));
+  };
+
   const [fil,setFil]=useState({
     status:"",funnelType:"",enquiryType:"",
-    leadSource:"",    // ① NEW
-    descFilter:"",    // ② NEW
+    leadSource:"",
+    descFilter:"",
     missed:false,todayF:false,upcoming:false,
   });
 
@@ -1273,7 +1408,6 @@ function Shell({user,users,onLogout,onUsersChange}) {
   const [editT,setEditT]=useState(null);
   const [viewT,setViewT]=useState(null);
 
-  // ③ Per-stage custom descriptions state
   const [stageDescs,setStageDescs]=useState({"New Lead":"","Qualified":"","Proposal Sent":"","Won":""});
   const onStageDescChange=(stage,val)=>setStageDescs(d=>({...d,[stage]:val}));
 
@@ -1281,29 +1415,23 @@ function Shell({user,users,onLogout,onUsersChange}) {
 
   const TODAY=today();
 
-  // ① reset includes new filters
   const sf=(k,v)=>setFil(f=>({...f,[k]:v}));
   const rf=()=>setFil({status:"",funnelType:"",enquiryType:"",leadSource:"",descFilter:"",missed:false,todayF:false,upcoming:false});
 
   const scoped=useMemo(()=>FULL.includes(user.role)?funnels:funnels.filter(f=>f.createdBy===user.name),[funnels,user]);
 
   const filtered=useMemo(()=>scoped.filter(f=>{
-    // global text search (topbar)
-    if(search){const q=search.toLowerCase();if(!f.company.toLowerCase().includes(q)&&!(f.contact||"").toLowerCase().includes(q)&&!(f.email||"").toLowerCase().includes(q))return false;}
-    // status / type / enquiry dropdowns
+    if(search){const q=search.toLowerCase();if(!(f.company||"").toLowerCase().includes(q)&&!(f.contact||"").toLowerCase().includes(q)&&!(f.email||"").toLowerCase().includes(q))return false;}
     if(fil.status      && f.status     !==fil.status)      return false;
     if(fil.funnelType  && f.funnelType !==fil.funnelType)  return false;
     if(fil.enquiryType && f.enquiryType!==fil.enquiryType) return false;
-    // ① lead source filter
     if(fil.leadSource  && f.leadSource !==fil.leadSource)  return false;
-    // ② description filter — contains search across remarks + quoteDesc
     if(fil.descFilter){
       const q=fil.descFilter.toLowerCase();
       const inRemarks =(f.remarks   ||"").toLowerCase().includes(q);
       const inQuote   =(f.quoteDesc ||"").toLowerCase().includes(q);
       if(!inRemarks&&!inQuote) return false;
     }
-    // follow-up checkboxes
     if(fil.missed   && (!f.nextFollowUp||f.nextFollowUp>=TODAY)) return false;
     if(fil.todayF   && f.nextFollowUp!==TODAY)                   return false;
     if(fil.upcoming && f.nextFollowUp<=TODAY)                    return false;
@@ -1334,7 +1462,7 @@ function Shell({user,users,onLogout,onUsersChange}) {
 
   return (
     <div style={{display:"flex",minHeight:"100vh",background:T.bg,fontFamily:F}}>
-      <Sidebar active={view} set={setView} user={user} onLogout={onLogout}/>
+      <Sidebar active={view} set={setView} user={user} onLogout={onLogout} open={sidebarOpen} onClose={()=>setSidebarOpen(false)}/>
       <div style={{flex:1,display:"flex",flexDirection:"column",minWidth:0,minHeight:"100vh"}}>
         <Topbar
           title={titles[view]} sub={subs[view]}
@@ -1343,18 +1471,17 @@ function Shell({user,users,onLogout,onUsersChange}) {
           onExportAll={()=>{xls(scoped,`Ekanta_All_${TODAY}.xls`);push(`Exported ${scoped.length} funnels`,"info");}}
           onExportFiltered={()=>{xls(filtered,`Ekanta_Filtered_${TODAY}.xls`);push(`Exported ${filtered.length} funnels`,"info");}}
           fLen={filtered.length} aLen={scoped.length}
+          onMenuToggle={()=>setSidebarOpen(x=>!x)}
         />
 
         {showStats&&<Stats funnels={scoped}/>}
         {showFilters&&<div style={{marginTop:16}}><FilterBar fil={fil} setF={sf} reset={rf}/></div>}
         {showStats&&!showFilters&&<div style={{height:16}}/>}
 
-        {/* Content area */}
         <div style={{flex:1,background:showFilters?T.surface:"transparent",borderTop:showFilters?`1px solid ${T.line}`:"none"}}>
           {(view==="dashboard"||view==="funnels")&&(
             <Table rows={filtered} user={user} onView={setViewT} onEdit={f=>setEditT(f)} onDelete={del}/>
           )}
-          {/* ③ stageDescs + onStageDescChange passed to Pipeline */}
           {view==="pipeline"&&(
             <Pipeline
               funnels={scoped} user={user}
@@ -1368,7 +1495,17 @@ function Shell({user,users,onLogout,onUsersChange}) {
       </div>
 
       {(addOpen||editT)&&<FunnelForm onClose={()=>{setAddOpen(false);setEditT(null);}} onSave={save} existing={editT}/>}
-      {viewT&&<ViewDrawer funnel={viewT} onClose={()=>setViewT(null)} onEdit={f=>setEditT(f)} onStatusChange={upStatus} user={user}/>}
+      {viewT&&(
+        <ViewDrawer
+          funnel={viewT}
+          onClose={()=>setViewT(null)}
+          onEdit={f=>setEditT(f)}
+          onStatusChange={upStatus}
+          user={user}
+          comments={funnelComments[viewT.id]||[]}
+          onAddComment={addComment}
+        />
+      )}
       <Toaster list={toasts}/>
     </div>
   );
