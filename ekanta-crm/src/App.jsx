@@ -1029,6 +1029,8 @@ function FunnelForm({onClose,onSave,existing}) {
   // ① company is now optional — removed from required validation
   const val=()=>{
     const e={};
+    if(!form.contact.trim()) e.contact="Required";
+    if(!form.phone.trim())   e.phone="Required";
     if(!form.leadSource)   e.leadSource="Please select a lead source";
     if(!form.nextFollowUp) e.nfu="Required";
     setErrs(e);
@@ -1064,8 +1066,8 @@ function FunnelForm({onClose,onSave,existing}) {
               {/* ① company not required */}
               <FInput label="Company name" value={form.company} onChange={e=>set("company",e.target.value)} placeholder="e.g. Bridal Bliss Boutique"/>
               <div className="ek-form-3col" style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
-                <FInput label="Contact person" value={form.contact} onChange={e=>set("contact",e.target.value)} placeholder="Full name"/>
-                <FInput label="Phone" value={form.phone} onChange={e=>set("phone",e.target.value)} placeholder="+91 98765 43210"/>
+                <FInput label="Contact person" required value={form.contact} onChange={e=>set("contact",e.target.value)} placeholder="Full name" error={errs.contact}/>
+<FInput label="Phone" required value={form.phone} onChange={e=>set("phone",e.target.value)} placeholder="+91 98765 43210" error={errs.phone}/>
                 <FInput label="Email" type="email" value={form.email} onChange={e=>set("email",e.target.value)} placeholder="email@company.com"/>
               </div>
               {/* ③ City/Region field */}
