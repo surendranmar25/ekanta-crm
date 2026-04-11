@@ -101,13 +101,13 @@ const FULL  = ["CEO","Manager"];
 const can   = (u, a) => FULL.includes(u?.role) || a === "create" || a === "export";
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
-const CATS         = ["Dresses","Sarees","Western Wear","Kurtis","Lehengas","Accessories"];
-const ENQS         = ["New Client","Repeat Order","Bulk Order","Custom Design","Wholesale","Export"];
-const FTYPES       = ["Normal","High Value","Bulk","Strategic","Premium"];
+const CATS         = ["Kurtis","Sarees","Kids Wear","Family Combo","Mens Wear","Blouse","Customs"];
+const ENQS         = ["New Client","Repeat Order","Bulk Order","Wholesale","Export"];
+const FTYPES       = ["Normal","High Value","Bulk","Premium"];
 const ROLES        = ["CEO","Manager","Sales Coordinator","CRE"];
 const STATUS       = ["Pending","Won","Lost","Drop"];
 const STAGES       = ["New Lead","Qualified","Proposal Sent","Won"];
-const LEAD_SOURCES = ["WhatsApp","Email","Website","Call","Owner","Other"];
+const LEAD_SOURCES = ["WhatsApp","Email","Website","Call","Owner","Social Media","OtherSource"];
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 const today = () => new Date().toISOString().split("T")[0];
